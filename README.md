@@ -10,3 +10,7 @@ Post campaign, if the prototype gets selected, there will be several aspects tha
 >Performance and presentation of the system
 >Functionality and validations inbuilt in the system
 >Backend intelligence for quicker skill mapping
+
+
+Demo link:
+https://youtu.be/VHyty7ZWTYQ
