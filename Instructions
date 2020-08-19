@@ -1,0 +1,17 @@
+# Instruction
+To run the prototype the prerequisite is to have streamlit library installed.
+the command for the same is :   
+pip install streamlit
+
+Save the python file in the desired location in the server.
+In the same folder, please keep the provided Data.xlsx sheet as was provided in the hacker earth platform in the reference section.
+
+Once installed, go to the command prompt and enter the following commands in sequence
+1. cd <<folder hosting the python file>>
+2. streamlit run <<python file name>>
+
+The host address will be provided in the command prompt window. Use the address to use the service from any device connected to the same network.
+
+The landing page will be an individual request submission page and the check for "Bulk upload" can be selected to check the result for all requests in the demand sheet of the provided excel.
+
+Please refer to the video link for a demonstration of the platform.
