@@ -274,249 +274,258 @@ def indivscore(rank,exp,SVCL,SubSVCL,SMU,city,country,Tech1,Tech2,Tech3,Func1,Fu
         
     return Score2
 
-# Bulk Load
+###################################################################################
+###################################### Bulk Load ###################################
 if st.checkbox("Bulk Upload",False):
-    Demand=pd.read_excel('Demand.xlsx',sheet_name='Sheet1',header=0,na_filter=True)
-#Demand Data Issue handling - Drop rows with all nan
-    Demand.dropna(axis=0,how='all',inplace=True)
-    Demand_tmp=Demand.copy()
-    cols=['Technical Skill 1','Technical Skill 2','Technical Skill 3','Functional Skill 1',
-          'Functional Skill 2','Functional Skill 3',
-          'Process Skill 1','Process Skill 2','Process Skill 3']
-    discrepancy=[]
-    for col in cols:
-        Demand_tmp[col]=Demand_tmp[col].str.replace(' ', '')
-        for i in Demand_tmp.index:
-            for col in cols:
-                flag=0
-                for j in list(Skill['Skill']):
-                    if(str(Demand[col][i]).find(j)!=-1):
-                        flag=1
-                        break
-                if flag==1:
-                    Demand_tmp[col][i]=str(Demand[col][i])
-                else:
-                    flag2=0
-                    ind=-1
-                    for j in list(Skill['word']):
-                        ind = ind+1
-                        for k in j:
-                            if(str(Demand_tmp[col][i]).find(k)!=-1):
-                                flag2=1
-                                Demand_tmp[col][i]=str(Skill.iloc[ind,4])
-                                break
-                    if flag2==0:
-                        discrepancy.append(str(Demand_tmp[col][i]))
-                        Demand_tmp[col][i]="N/A"
-    discrepancy_set=list(set(discrepancy)) 
-    if len(discrepancy_set)>2:
-        st.write("Found discrepancy in the following skills. Please correct and submit")
-        st.write(discrepancy)
-    else:
-        Score=pd.DataFrame([],columns=['Request','Employee','score_nonskill','score_skill','total_score',
-                                       'ServiceLine','SubSvcLine','SMU'])
-        ctr=0
-        for i in Demand_tmp.index:
-            Req_rank=Demand_tmp.loc[i,'Rank']
-            req_min_exp=Demand_tmp.loc[i,'Min Experience']
-            req_city = Demand_tmp.loc[i,'Location ']
-            req_Country = Demand_tmp.loc[i,'Country']
-            req_SubSVC=Demand_tmp.loc[i,'Requestor Sub ServiceLine']
-            req_SMU=Demand_tmp.loc[i,'Requestor SMU']
+    #import io
+    #file_buffer = st.file_uploader(...)
+    #text_io = io.TextIOWrapper(file_buffer)
+    uploaded_file = st.file_uploader("Choose the demand Excel file", type="xlsx")
+    if uploaded_file is not None:
+        data = pd.read_excel(uploaded_file)
+        #st.write(data)
+        st.set_option('deprecation.showfileUploaderEncoding', False)
+        Demand=data
+    #Demand Data Issue handling - Drop rows with all nan
+        Demand.dropna(axis=0,how='all',inplace=True)
+        Demand_tmp=Demand.copy()
+        cols=['Technical Skill 1','Technical Skill 2','Technical Skill 3','Functional Skill 1',
+              'Functional Skill 2','Functional Skill 3',
+              'Process Skill 1','Process Skill 2','Process Skill 3']
+        discrepancy=[]
+        for col in cols:
+            Demand_tmp[col]=Demand_tmp[col].str.replace(' ', '')
+            for i in Demand_tmp.index:
+                for col in cols:
+                    flag=0
+                    for j in list(Skill['Skill']):
+                        if(str(Demand[col][i]).find(j)!=-1):
+                            flag=1
+                            break
+                    if flag==1:
+                        Demand_tmp[col][i]=str(Demand[col][i])
+                    else:
+                        flag2=0
+                        ind=-1
+                        for j in list(Skill['word']):
+                            ind = ind+1
+                            for k in j:
+                                if(str(Demand_tmp[col][i]).find(k)!=-1):
+                                    flag2=1
+                                    Demand_tmp[col][i]=str(Skill.iloc[ind,4])
+                                    break
+                        if flag2==0:
+                            discrepancy.append(str(Demand_tmp[col][i]))
+                            Demand_tmp[col][i]="N/A"
+        discrepancy_set=list(set(discrepancy)) 
+        if len(discrepancy_set)>2:
+            st.write("Found discrepancy in the following skills. Please correct and submit")
+            st.write(discrepancy)
+        else:
+            Score=pd.DataFrame([],columns=['Request','Employee','score_nonskill','score_skill','total_score',
+                                           'ServiceLine','SubSvcLine','SMU'])
+            ctr=0
+            for i in Demand_tmp.index:
+                Req_rank=Demand_tmp.loc[i,'Rank']
+                req_min_exp=Demand_tmp.loc[i,'Min Experience']
+                req_city = Demand_tmp.loc[i,'Location ']
+                req_Country = Demand_tmp.loc[i,'Country']
+                req_SubSVC=Demand_tmp.loc[i,'Requestor Sub ServiceLine']
+                req_SMU=Demand_tmp.loc[i,'Requestor SMU']
+                
+                ## weights of each factor for SVC Line
+                req_SVC=Demand_tmp.loc[i,'Requestor Service Line']
+                req_SVC=req_SVC.replace('ServiceLine','SVCL')
+                rankw=Weightage.loc[5,req_SVC]
+                expw=Weightage.loc[1,req_SVC]
+                locw=Weightage.loc[3,req_SVC]
+                BAw=Weightage.loc[0,req_SVC]
             
-            ## weights of each factor for SVC Line
-            req_SVC=Demand_tmp.loc[i,'Requestor Service Line']
-            req_SVC=req_SVC.replace('ServiceLine','SVCL')
-            rankw=Weightage.loc[5,req_SVC]
-            expw=Weightage.loc[1,req_SVC]
-            locw=Weightage.loc[3,req_SVC]
-            BAw=Weightage.loc[0,req_SVC]
-        
-            for j in Supply_master.index:
-                emp_rank=Supply_master.loc[j,'Rank']
-                rankscore=rank_score(Req_rank,emp_rank)
-                rankscore=rankscore*rankw
-        
-                emp_exp=Supply_master.loc[j,'Years of experience']
-                expscore=round(exp_score(req_min_exp,emp_exp),1)
-                expscore=expscore*expw
-                
-        
-                emp_city=Supply_master.loc[j,'City']
-                emp_Country=Supply_master.loc[j,'Country']
-                locscore=loc_score(req_city,req_Country,emp_city,emp_Country)
-                locscore=locscore*locw
-        
-                BAscore=BA_score(j)
-                BAscore=BAscore*BAw
-        
-                total_score=round((rankscore+expscore+locscore+BAscore),2)
-                
-                SVCscore=0
-                Subsvcscore=0
-                SMUscore=0
-                
-                if Supply_master.loc[j,'Service Line']==Demand_tmp.loc[i,'Requestor Service Line']:
-                    SVCscore=1
-                if Supply_master.loc[j,'Sub Service Line']==req_SubSVC:
-                    Subsvcscore=1
-                if Supply_master.loc[j,'SMU']==req_SMU:
-                    SMUscore=1
+                for j in Supply_master.index:
+                    emp_rank=Supply_master.loc[j,'Rank']
+                    rankscore=rank_score(Req_rank,emp_rank)
+                    rankscore=rankscore*rankw
+            
+                    emp_exp=Supply_master.loc[j,'Years of experience']
+                    expscore=round(exp_score(req_min_exp,emp_exp),1)
+                    expscore=expscore*expw
                     
-                Score.loc[ctr,'score_nonskill']=total_score
-                Score.loc[ctr,'Employee']=Supply_master.loc[j,'Name/ID']
-                Score.loc[ctr,'Request']=Demand_tmp.loc[i,'Requestor']
-                Score.loc[ctr,'ServiceLine']=SVCscore
-                Score.loc[ctr,'SubSvcLine']=Subsvcscore
-                Score.loc[ctr,'SMU']=SMUscore
-                
-                ctr=ctr+1
-        #Skill scorer
-        pd_ctr=0
-        for ind in Demand_tmp.index:
-            req_SVC=Demand_tmp.loc[ind,'Requestor Service Line']
-            req_SVC=req_SVC.replace('ServiceLine','SVCL')
-            techW=Weightage.loc[6,req_SVC]
             
-            for emp in Supply_skill['Name/ID'].unique():
-                score=0
-                tech1s=tech2s=tech3s=0
-                counter=0
-                if Demand_tmp.loc[ind,'Technical Skill 1'] != 'N/A':
-                    tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Technical Skill 1'])].tolist()
-                    if len(tech1ind)>0:
-                        tech1ind=tech1ind[0]
-                        skillscore=Supply_skill.loc[tech1ind,'Skill Level']
-                        tech1s=skillscore
-                    counter=counter+1
+                    emp_city=Supply_master.loc[j,'City']
+                    emp_Country=Supply_master.loc[j,'Country']
+                    locscore=loc_score(req_city,req_Country,emp_city,emp_Country)
+                    locscore=locscore*locw
+            
+                    BAscore=BA_score(j)
+                    BAscore=BAscore*BAw
+            
+                    total_score=round((rankscore+expscore+locscore+BAscore),2)
+                    
+                    SVCscore=0
+                    Subsvcscore=0
+                    SMUscore=0
+                    
+                    if Supply_master.loc[j,'Service Line']==Demand_tmp.loc[i,'Requestor Service Line']:
+                        SVCscore=1
+                    if Supply_master.loc[j,'Sub Service Line']==req_SubSVC:
+                        Subsvcscore=1
+                    if Supply_master.loc[j,'SMU']==req_SMU:
+                        SMUscore=1
                         
-                if Demand_tmp.loc[ind,'Technical Skill 2'] != 'N/A':
-                    tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Technical Skill 2'])].tolist()
-                    if len(tech1ind)>0:
-                        tech1ind=tech1ind[0]
-                        skillscore=Supply_skill.loc[tech1ind,'Skill Level']
-                        tech2s=skillscore
-                    counter=counter+1
-                        
-                if Demand_tmp.loc[ind,'Technical Skill 3'] != 'N/A':
-                    tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Technical Skill 3'])].tolist()
-                    if len(tech1ind)>0:
-                        tech1ind=tech1ind[0]
-                        skillscore=Supply_skill.loc[tech1ind,'Skill Level']
-                        tech3s=skillscore
-                    counter=counter+1
-                        
-                if counter>0:
-                    score=round(((tech1s+tech2s+tech3s)/counter)*techW,2)
-                else:
+                    Score.loc[ctr,'score_nonskill']=total_score
+                    Score.loc[ctr,'Employee']=Supply_master.loc[j,'Name/ID']
+                    Score.loc[ctr,'Request']=Demand_tmp.loc[i,'Requestor']
+                    Score.loc[ctr,'ServiceLine']=SVCscore
+                    Score.loc[ctr,'SubSvcLine']=Subsvcscore
+                    Score.loc[ctr,'SMU']=SMUscore
+                    
+                    ctr=ctr+1
+            #Skill scorer
+            pd_ctr=0
+            for ind in Demand_tmp.index:
+                req_SVC=Demand_tmp.loc[ind,'Requestor Service Line']
+                req_SVC=req_SVC.replace('ServiceLine','SVCL')
+                techW=Weightage.loc[6,req_SVC]
+                
+                for emp in Supply_skill['Name/ID'].unique():
                     score=0
-                #score=round(score*techW,2)
-                
-                Score.loc[pd_ctr,'score_skill']=score
-                pd_ctr=pd_ctr+1
-        
-        #Functional skill
-        pd_ctr=0
-        for ind in Demand_tmp.index:
-            req_SVC=Demand_tmp.loc[ind,'Requestor Service Line']
-            req_SVC=req_SVC.replace('ServiceLine','SVCL')
-            funcW=Weightage.loc[2,req_SVC]
-            
-            for emp in Supply_skill['Name/ID'].unique():
-                score=0
-                counter=0
-                if Demand_tmp.loc[ind,'Functional Skill 1'] != 'N/A':
-                    tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Functional Skill 1'])].tolist()
-                    if len(tech1ind)>0:
-                        tech1ind=tech1ind[0]
-                        skillscore=Supply_skill.loc[tech1ind,'Skill Level']
-                        score=score+skillscore
-                    counter=counter+1
-                        
-                
-                if Demand_tmp.loc[ind,'Functional Skill 2'] != 'N/A':
-                    tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Functional Skill 2'])].tolist()
-                    if len(tech1ind)>0:
-                        tech1ind=tech1ind[0]
-                        skillscore=Supply_skill.loc[tech1ind,'Skill Level']
-                        score=score+skillscore
-                    counter=counter+1
-                        
-                if Demand_tmp.loc[ind,'Functional Skill 3'] != 'N/A':
-                    tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Functional Skill 3'])].tolist()
-                    if len(tech1ind)>0:
-                        tech1ind=tech1ind[0]
-                        skillscore=Supply_skill.loc[tech1ind,'Skill Level']
-                        score=score+skillscore
-                    counter=counter+1
-                if counter>0:
-                    score=round(score/counter,2)
-                else:
-                    score=score
-                score=round(score*funcW,2)
-                
-                FuncScore=score
-                Score.loc[pd_ctr,'score_skill']=Score.loc[pd_ctr,'score_skill']+score
-                
-                pd_ctr=pd_ctr+1
-        
-        #Process skill
-        pd_ctr=0
-        for ind in Demand_tmp.index:
-            req_SVC=Demand_tmp.loc[ind,'Requestor Service Line']
-            req_SVC=req_SVC.replace('ServiceLine','SVCL')
-            procW=Weightage.loc[4,req_SVC]
-            
-            for emp in Supply_skill['Name/ID'].unique():
-                score=0
-                counter=0
-                if Demand_tmp.loc[ind,'Process Skill 1'] != 'N/A':
-                    tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Process Skill 1'])].tolist()
-                    if len(tech1ind)>0:
-                        tech1ind=tech1ind[0]
-                        skillscore=Supply_skill.loc[tech1ind,'Skill Level']
-                        score=score+skillscore
-                    counter=counter+1
-                
-                if Demand_tmp.loc[ind,'Process Skill 2'] != 'N/A':
-                    tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Process Skill 2'])].tolist()
-                    if len(tech1ind)>0:
-                        tech1ind=tech1ind[0]
-                        skillscore=Supply_skill.loc[tech1ind,'Skill Level']
-                        score=score+skillscore
-                    counter=counter+1
-                        
-                if Demand_tmp.loc[ind,'Process Skill 3'] != 'N/A':
-                    tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Process Skill 3'])].tolist()
-                    if len(tech1ind)>0:
-                        tech1ind=tech1ind[0]
-                        skillscore=Supply_skill.loc[tech1ind,'Skill Level']
-                        score=score+skillscore
-                    counter=counter+1
+                    tech1s=tech2s=tech3s=0
+                    counter=0
+                    if Demand_tmp.loc[ind,'Technical Skill 1'] != 'N/A':
+                        tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Technical Skill 1'])].tolist()
+                        if len(tech1ind)>0:
+                            tech1ind=tech1ind[0]
+                            skillscore=Supply_skill.loc[tech1ind,'Skill Level']
+                            tech1s=skillscore
+                        counter=counter+1
+                            
+                    if Demand_tmp.loc[ind,'Technical Skill 2'] != 'N/A':
+                        tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Technical Skill 2'])].tolist()
+                        if len(tech1ind)>0:
+                            tech1ind=tech1ind[0]
+                            skillscore=Supply_skill.loc[tech1ind,'Skill Level']
+                            tech2s=skillscore
+                        counter=counter+1
+                            
+                    if Demand_tmp.loc[ind,'Technical Skill 3'] != 'N/A':
+                        tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Technical Skill 3'])].tolist()
+                        if len(tech1ind)>0:
+                            tech1ind=tech1ind[0]
+                            skillscore=Supply_skill.loc[tech1ind,'Skill Level']
+                            tech3s=skillscore
+                        counter=counter+1
+                            
+                    if counter>0:
+                        score=round(((tech1s+tech2s+tech3s)/counter)*techW,2)
+                    else:
+                        score=0
+                    #score=round(score*techW,2)
                     
-                if counter>0:
-                    score=round(score/counter,2)
-                else:
-                    score=score
-                score=round(score*procW,2)
+                    Score.loc[pd_ctr,'score_skill']=score
+                    pd_ctr=pd_ctr+1
+            
+            #Functional skill
+            pd_ctr=0
+            for ind in Demand_tmp.index:
+                req_SVC=Demand_tmp.loc[ind,'Requestor Service Line']
+                req_SVC=req_SVC.replace('ServiceLine','SVCL')
+                funcW=Weightage.loc[2,req_SVC]
                 
-                ProcScore=score
-                Score.loc[pd_ctr,'score_skill']=round((Score.loc[pd_ctr,'score_skill']+score),2)
+                for emp in Supply_skill['Name/ID'].unique():
+                    score=0
+                    counter=0
+                    if Demand_tmp.loc[ind,'Functional Skill 1'] != 'N/A':
+                        tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Functional Skill 1'])].tolist()
+                        if len(tech1ind)>0:
+                            tech1ind=tech1ind[0]
+                            skillscore=Supply_skill.loc[tech1ind,'Skill Level']
+                            score=score+skillscore
+                        counter=counter+1
+                            
+                    
+                    if Demand_tmp.loc[ind,'Functional Skill 2'] != 'N/A':
+                        tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Functional Skill 2'])].tolist()
+                        if len(tech1ind)>0:
+                            tech1ind=tech1ind[0]
+                            skillscore=Supply_skill.loc[tech1ind,'Skill Level']
+                            score=score+skillscore
+                        counter=counter+1
+                            
+                    if Demand_tmp.loc[ind,'Functional Skill 3'] != 'N/A':
+                        tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Functional Skill 3'])].tolist()
+                        if len(tech1ind)>0:
+                            tech1ind=tech1ind[0]
+                            skillscore=Supply_skill.loc[tech1ind,'Skill Level']
+                            score=score+skillscore
+                        counter=counter+1
+                    if counter>0:
+                        score=round(score/counter,2)
+                    else:
+                        score=score
+                    score=round(score*funcW,2)
+                    
+                    FuncScore=score
+                    Score.loc[pd_ctr,'score_skill']=Score.loc[pd_ctr,'score_skill']+score
+                    
+                    pd_ctr=pd_ctr+1
+            
+            #Process skill
+            pd_ctr=0
+            for ind in Demand_tmp.index:
+                req_SVC=Demand_tmp.loc[ind,'Requestor Service Line']
+                req_SVC=req_SVC.replace('ServiceLine','SVCL')
+                procW=Weightage.loc[4,req_SVC]
                 
-                pd_ctr=pd_ctr+1
-# FInal display
-        
-        Score['total_score']=Score['score_nonskill']+Score['score_skill']
-        Score['total_score']=Score['total_score'].apply(lambda x:round(x,2))
-        #Score=Score.sort_values(by=['total_score','SMU','SubSvcLine','ServiceLine'],ascending=False)
-        Score=Score.sort_values(by=['ServiceLine','SubSvcLine','SMU','total_score'],ascending=False)
-
-        st.subheader("Input requests")
-        st.write(Demand_tmp)
-        Request = st.slider("Request selector",1, Demand_tmp['Requestor'].nunique())
-        ReqID="Req_"+str(Request)
-        st.subheader("Employee wise data")
-        st.write(Score[Score['Request']==ReqID])
+                for emp in Supply_skill['Name/ID'].unique():
+                    score=0
+                    counter=0
+                    if Demand_tmp.loc[ind,'Process Skill 1'] != 'N/A':
+                        tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Process Skill 1'])].tolist()
+                        if len(tech1ind)>0:
+                            tech1ind=tech1ind[0]
+                            skillscore=Supply_skill.loc[tech1ind,'Skill Level']
+                            score=score+skillscore
+                        counter=counter+1
+                    
+                    if Demand_tmp.loc[ind,'Process Skill 2'] != 'N/A':
+                        tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Process Skill 2'])].tolist()
+                        if len(tech1ind)>0:
+                            tech1ind=tech1ind[0]
+                            skillscore=Supply_skill.loc[tech1ind,'Skill Level']
+                            score=score+skillscore
+                        counter=counter+1
+                            
+                    if Demand_tmp.loc[ind,'Process Skill 3'] != 'N/A':
+                        tech1ind=Supply_skill.index[(Supply_skill['Name/ID']==emp)&(Supply_skill['Skill']==Demand_tmp.loc[ind,'Process Skill 3'])].tolist()
+                        if len(tech1ind)>0:
+                            tech1ind=tech1ind[0]
+                            skillscore=Supply_skill.loc[tech1ind,'Skill Level']
+                            score=score+skillscore
+                        counter=counter+1
+                        
+                    if counter>0:
+                        score=round(score/counter,2)
+                    else:
+                        score=score
+                    score=round(score*procW,2)
+                    
+                    ProcScore=score
+                    Score.loc[pd_ctr,'score_skill']=round((Score.loc[pd_ctr,'score_skill']+score),2)
+                    
+                    pd_ctr=pd_ctr+1
+    # FInal display
+            
+            Score['total_score']=Score['score_nonskill']+Score['score_skill']
+            Score['total_score']=Score['total_score'].apply(lambda x:round(x,2))
+            #Score=Score.sort_values(by=['total_score','SMU','SubSvcLine','ServiceLine'],ascending=False)
+            Score=Score.sort_values(by=['ServiceLine','SubSvcLine','SMU','total_score'],ascending=False)
+    
+            st.subheader("Input requests")
+            st.write(Demand_tmp)
+            Request = st.slider("Request selector",1, Demand_tmp['Requestor'].nunique())
+            ReqID="Req_"+str(Request)
+            st.subheader("Employee wise data")
+            st.write(Score[Score['Request']==ReqID])
 
     
 ##########################################################################
@@ -568,9 +577,3 @@ else:
         Score2=pd.DataFrame()
         Score2=indivscore(Rank,int(Exp),SVCL,SubSVCL,SMU,City,Country,Tech1,Tech2,Tech3,Func1,Func2,Func3,Proc1,Proc2,Proc3)
         st.write(Score2)
-
-    
-    
-              
-    
-        
